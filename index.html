@@ -35,7 +35,7 @@
         const width = 500,
             height = 700
 
-        const margin = { top: 55, right: 20, bottom: 60, left: 150 },
+        const margin = { top: 55, right: 20, bottom: 60, left: 200 },
             innerHeight = height - margin.top - margin.bottom,
             innerWidth = width - margin.left - margin.right;
 
@@ -82,7 +82,8 @@
         
         g.append('text')
             .attr('class', 'axis axis-x label')
-            .attr('transform', `translate(${(margin.left + innerWidth)/2}, ${35 + margin.top + innerHeight})`)
+            .attr('transform', `translate(${margin.left + innerWidth/2}, ${35 + margin.top + innerHeight})`)
+            .attr('text-anchor', 'middle')
             .text('Number of restaurants')
 
         canvas.selectAll('rect')
