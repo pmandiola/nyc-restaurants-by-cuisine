@@ -1,0 +1,14 @@
+.bar {
+    fill: lightGrey;
+    stroke: black;
+}
+
+.bar:hover {
+    fill: steelBlue;
+}
+
+.axis-y .domain,
+.axis-x .domain,
+.grid .domain {
+    display: none;
+  }

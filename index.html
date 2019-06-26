@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+
+  <link href='styles.css' rel='stylesheet' />
+</head>
+<body>
+    <div  style='display:flex;'>
+        <div id="chart"></div>
+        <div id="map"></div>
+    </div>
+</body>
+
+<script>
+
+    store = {}
+
+    function loadData() {
+        return Promise.all([
+            d3.json("nyc_restaurants_by_cuisine.json"),
+            d3.json("nyc_zip.geojson"),
+        ]).then(datasets => {
+            store.cuisines = datasets[0].sort((x,y) => d3.descending(x.total, y.total)).slice(0,25);
+            store.geoJson = datasets[1]
+            return store;
+        })
+    }
+
+    function createChart(data) {
+
+        const width = 500,
+            height = 700
+
+        const margin = { top: 55, right: 20, bottom: 60, left: 150 },
+            innerHeight = height - margin.top - margin.bottom,
+            innerWidth = width - margin.left - margin.right;
+
+        var maxTotal = d3.max(data, d => d.total)
+
+        var xScale = d3.scaleLinear()
+            .domain([0, maxTotal])
+            .range([0, innerWidth])
+  
+        var yScale = d3.scaleBand()
+            .domain(data.map(d => d.cuisine))
+            .rangeRound([0, innerHeight])
+
+        var chart = d3.select("#chart");
+        var canvas = chart.append("svg")
+            .attr("width", width)
+            .attr("height", height)
+
+        var g = canvas.append('g')
+  
+        g.append('g')
+            .attr('class', 'axis axis-y')
+            .attr('transform', `translate(${margin.left}, ${margin.top})`)
+            .call(d3.axisLeft(yScale))
+
+        g.append('g')
+            .attr('class', 'axis axis-x')
+            .attr('transform', `translate(${margin.left}, ${margin.top})`)
+            .call(d3.axisTop(xScale).ticks(4))
+
+        g.append("g")
+  	    	.attr("class","grid")
+  		    .attr("transform",`translate(${margin.left}, ${margin.top})`)
+  		    .attr("stroke-opacity",0.3)
+  		    .call(d3.axisTop(xScale)
+                .tickSize(-innerHeight)
+                .tickFormat("")
+                .ticks(4))
+
+        g.append('g')
+            .attr('class', 'axis axis-x')
+            .attr('transform', `translate(${margin.left}, ${margin.top + innerHeight})`)
+            .call(d3.axisBottom(xScale).ticks(4))
+        
+        g.append('text')
+            .attr('class', 'axis axis-x label')
+            .attr('transform', `translate(${(margin.left + innerWidth)/2}, ${35 + margin.top + innerHeight})`)
+            .text('Number of restaurants')
+
+        canvas.selectAll('rect')
+            .data(data).enter()
+            .append('rect')
+            .classed('bar', true)
+            .attr('width', d => xScale(d.total))
+            .attr('height', yScale.bandwidth()-2)
+            .attr('y', d => yScale(d.cuisine))
+            .attr('x', 0)
+            .attr('transform', `translate(${margin.left}, ${margin.top})`)
+            .on('mouseover', function(d) {
+                d3.select(this)
+                .transition().duration(300)
+                .attr('width', d => xScale(d.total) + 10)
+                .attr('height', yScale.bandwidth()+2)
+                .attr('y', d => yScale(d.cuisine)-2)
+                .attr('x', - 5)
+
+                updateMap(d.perZip, d.cuisine)
+            })
+            .on('mouseout', function(d) {
+                d3.select(this)
+                .transition().duration(300)
+                .attr('width', d => xScale(d.total))
+                .attr('height', yScale.bandwidth()-2)
+                .attr('y', d => yScale(d.cuisine))
+                .attr('x', 0)
+
+                updateMap()
+            })
+
+    }
+
+    function createMap(geoJson) {
+
+        const width = 800,
+            height = 700
+
+        const margin = { top: 60, right: 20, bottom: 20, left: 100 },
+            barHeight = 5,
+            barWidth = 150
+
+        let projection = d3.geoMercator()
+            .scale(Math.pow(2, 10.66 + 5.34))
+            .center([-73.94, 40.70])
+            .translate([width / 2 + 20, height / 2])
+
+        var map = d3.select("#map");
+        var canvas = map.append("svg")
+            .attr("width", width)
+            .attr("height", height)
+
+        let path = d3.geoPath()
+            .projection(projection)
+
+        canvas.selectAll("path")
+            .data(geoJson.features, myKey)
+            .enter().append("path")
+            .classed('map-paths', true)
+            .attr("d", d => path(d))
+            .attr("stroke", "grey")
+            .attr("fill", "#eee")
+        
+        canvas.append('g')
+            .attr('id', 'legend')
+            .attr("transform", `translate(${margin.left},${margin.top})`)
+            .append("text")
+                .attr("fill", "#000")
+                .attr("font-weight", "bold")
+                .attr("text-anchor", "start")
+                .attr("y", -6)
+    }
+
+    function updateMap(data, name) {
+
+        if (data) {
+            
+            data = Object.entries(data)
+            maxTotal = d3.max(data, d => d[1])
+
+            //colorscale (for map and legend) and linearscale (for legend)
+            var colorScale = d3.scaleThreshold()
+                    .domain(d3.range(0, maxTotal, maxTotal/5))
+                    .range(d3.schemeBlues[5]),
+                legendScale = d3.scaleLinear()
+                    .domain(colorScale.domain())
+                    .range([0, 50])
+
+            //Number formatter for legend
+            var formatNumber = d3.format(".2s")
+
+            //Update zipcode colors
+            paths = d3.selectAll('.map-paths')
+                .data(data, myKey)
+
+            paths.transition()
+                .attr("fill", d => colorScale(d[1]))
+
+            paths.exit().transition()
+                .attr("fill", "white")
+
+            //Update legend (based on: https://bl.ocks.org/mbostock/4573883)
+            legendAxis = d3.select('#legend')
+
+            legendAxis.transition()
+                .attr('opacity', 1)
+
+            legendAxis.call(d3.axisBottom(legendScale)
+                .tickSize(13)
+                .tickValues(colorScale.domain())
+                .tickFormat(d => d === 0 ? d : formatNumber(d)))
+
+            legendAxis.selectAll("rect")
+                .data(colorScale.range().map(function(color) {
+                    var d = colorScale.invertExtent(color);
+                    if (d[0] == null) d[0] = legendScale.domain()[0];
+                    if (d[1] == null) d[1] = legendScale.domain()[1];
+                    return d;
+                }))
+                .enter().insert("rect", ".tick")
+                    .attr("height", 8)
+                    .attr("x", function(d) { return legendScale(d[0]); })
+                    .attr("width", function(d) { return legendScale(d[1]) - legendScale(d[0]); })
+                    .attr("fill", function(d) { return colorScale(d[0]); })
+
+            legendAxis.select("text")
+                .text(`Number of ${name} restaurants`);
+            
+        }
+        else {
+            d3.selectAll('.map-paths')
+                .transition()
+                .attr("fill", "#eee")
+
+            d3.select('#legend')
+                .transition()
+                .attr('opacity', 0)
+        }
+    }
+
+    function drawViews() {
+
+        createChart(store.cuisines)
+        createMap(store.geoJson)
+    }
+
+    function myKey(d) {
+        return (d[0]?d[0]:d.properties.zipcode);
+    }
+
+    loadData().then(drawViews)
+
+</script>
