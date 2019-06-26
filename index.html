@@ -145,14 +145,14 @@
             .enter().append("path")
             .classed('map-paths', true)
             .attr("d", d => path(d))
-            .attr("stroke", "grey")
-            .attr("fill", "#eee")
+            .attr("stroke", "black")
+            .attr("fill", "lightGrey")
         
         canvas.append('g')
             .attr('id', 'legend')
             .attr("transform", `translate(${margin.left},${margin.top})`)
             .append("text")
-                .attr("fill", "#000")
+                .attr("fill", "black")
                 .attr("font-weight", "bold")
                 .attr("text-anchor", "start")
                 .attr("y", -6)
@@ -217,7 +217,7 @@
         else {
             d3.selectAll('.map-paths')
                 .transition()
-                .attr("fill", "#eee")
+                .attr("fill", "lightGrey")
 
             d3.select('#legend')
                 .transition()
